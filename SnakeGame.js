@@ -11,9 +11,11 @@ renderer.setClearColor('rgb(255,255,255)');    // set background color
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(30, canvas.width / canvas.height, 0.1, 100);
-camera.position.set(0, -12, 15);
+camera.position.set( 0.13921937852101335, -33.60575621603862, 9.779251868769181);
+
 camera.lookAt(scene.position);
 scene.add(camera);
+window.camera = camera; // TODO DELETE THIS
 // scene.add(new THREE.AxesHelper(1.5));
 
 // Add light sources
@@ -21,6 +23,16 @@ scene.add(new THREE.AmbientLight('#ffffff'));
 const light = new THREE.DirectionalLight();
 light.position.set(0,0,1);
 scene.add(light);
+
+const spotlight = new THREE.SpotLight(0xffffff);
+spotlight.castShadow = true; // default false
+scene.add(spotlight);
+
+const lightPosition = new THREE.Vector3(0, -12, 15);
+spotlight.position.copy(lightPosition);
+spotlight.penumbra = 0.2;
+// spotlight.angle = -Math.PI / 3;
+spotlight.intensity = 20;
 
 // create an AudioListener and add it to the camera
 const listener = new THREE.AudioListener();
@@ -42,13 +54,43 @@ audioLoader.load( 'sound2.wav', function( buffer ) {
 	foodSound.setVolume( 0.5 );
 });
 
+// Sky cube
+const txtLoader = new THREE.TextureLoader();
+const urls = [
+  "resources/skybox/nz.jpg",
+  "resources/skybox/pz.jpg",
+  "resources/skybox/py.jpg",
+  "resources/skybox/ny.jpg",
+  "resources/skybox/px.jpg",
+  "resources/skybox/nx.jpg",
+];
+
+let matArray = [];
+urls.forEach(tn => {
+  const txt = txtLoader.load(tn);
+  matArray.push(new THREE.MeshBasicMaterial({map:txt, side:THREE.DoubleSide}));
+});
+
+const skyCubeSize = 70;
+let skyBoxGeo = new THREE.BoxGeometry(skyCubeSize,skyCubeSize,skyCubeSize);
+let skyBox = new THREE.Mesh(skyBoxGeo, matArray);
+skyBox.rotation.x = Math.PI / 2;
+scene.add(skyBox);
+
+// Gray ground
+const groundGeo = new THREE.CircleGeometry(skyCubeSize/2, 32);
+const groundMat = new THREE.MeshBasicMaterial({color:'gray'});
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.position.z = -0.002;
+scene.add(ground);
+
 // Playing Field
 const field = new THREE.Object3D;
 scene.add( field );
 
-const fieldSize = 10;
-const widthSegments = 10;
-const heightSegments = 10;
+const fieldSize = 12;
+const widthSegments = 12;
+const heightSegments = 12;
 const fieldGeometry = new THREE.PlaneGeometry( fieldSize, fieldSize, widthSegments, heightSegments );
 const fieldMaterial = new THREE.MeshBasicMaterial({ color: 0xc6bac2, 
                                                     side: THREE.DoubleSide, 
@@ -56,29 +98,122 @@ const fieldMaterial = new THREE.MeshBasicMaterial({ color: 0xc6bac2,
                                                     wireframeLinewidth:2.0 }); 
 fieldMaterial.transparent = true;
 fieldMaterial.opacity = 0.7;
-const playingField = new THREE.Mesh( fieldGeometry, fieldMaterial );
+
+const playingFieldTexture = txtLoader.load('resources/FloorsCheckerboard_S_Diffuse.jpg');
+playingFieldTexture.wrapS = THREE.RepeatWrapping;
+playingFieldTexture.wrapT = THREE.RepeatWrapping;
+playingFieldTexture.repeat.set(2,2);
+const playingFieldNormalMap = txtLoader.load('resources/FloorsCheckerboard_S_Normal.jpg');
+const playingFieldMaterial = new THREE.MeshStandardMaterial({
+  map: playingFieldTexture,
+  normalMap: playingFieldNormalMap,
+  // side: THREE.DoubleSide,
+  roughness: 0.8,
+  metalness: 0.2
+});
+
+const playingField = new THREE.Mesh(fieldGeometry, playingFieldMaterial);
 field.add( playingField );
 
+// walls
+const wallsLength = 13;
+
+const outerFrame = new THREE.Shape();
+outerFrame.moveTo(-wallsLength / 2, -wallsLength / 2);
+outerFrame.lineTo(-wallsLength / 2, wallsLength / 2);
+outerFrame.lineTo(wallsLength / 2, wallsLength / 2);
+outerFrame.lineTo(wallsLength / 2, -wallsLength / 2);
+outerFrame.lineTo(-wallsLength / 2, -wallsLength / 2);
+
+const innerFrame = new THREE.Shape();
+innerFrame.moveTo(-fieldSize / 2, -fieldSize / 2);
+innerFrame.lineTo(-fieldSize / 2, fieldSize / 2);
+innerFrame.lineTo(fieldSize / 2, fieldSize / 2);
+innerFrame.lineTo(fieldSize / 2, -fieldSize / 2);
+innerFrame.lineTo(-fieldSize / 2, -fieldSize / 2);
+
+outerFrame.holes.push(innerFrame);
+
+const frameExtrudeSettings = {
+  depth: 1,
+  bevelEnabled: false,
+};
+
+const wallTexture = txtLoader.load('resources/hardwood2_diffuse.jpg');
+wallTexture.wrapS = THREE.RepeatWrapping;
+wallTexture.wrapT = THREE.RepeatWrapping;
+wallTexture.repeat.set(0,3);
+const wallBumpMap = txtLoader.load('resources/hardwood2_bump.jpg')
+
+const frameGeometry = new THREE.ExtrudeGeometry(outerFrame, frameExtrudeSettings);
+const frameMaterial = new THREE.MeshStandardMaterial({
+  color: 0x9b8369,
+  side: THREE.DoubleSide,
+  map: wallTexture,
+  bumpMap: wallBumpMap,
+  bumpScale: 0.1
+});
+const frameMesh = new THREE.Mesh(frameGeometry, frameMaterial);
+scene.add(frameMesh);
+
 // Grid
-const size = 10;
-const divisions = 10;
-const gridHelper = new THREE.GridHelper( size, divisions );
-gridHelper.rotation.x = - Math.PI / 2;
-field.add( gridHelper );
+// const size = 12;
+// const divisions = 12;
+// const gridHelper = new THREE.GridHelper( fieldSize, fieldSize );
+// gridHelper.rotation.x = - Math.PI / 2;
+// field.add( gridHelper );
+
+// rounded cube
+
+function snakeSegment(){
+  const length = 0.70;
+
+  const shape = new THREE.Shape();
+  shape.moveTo( -length/2, -length/2 );
+  shape.lineTo( -length/2, length/2 );
+  shape.lineTo( length/2, length/2 );
+  shape.lineTo( length/2, -length/2 );
+  shape.lineTo( -length/2, -length/2 );
+
+  const extrudeSettings = {
+    steps: 1,
+    depth: 0.40,
+    bevelEnabled: true,
+    bevelThickness: 0.1,
+    bevelSize: 0.1,
+    bevelOffset: 0,
+    bevelSegments: 8
+  };
+
+  const geo = new THREE.ExtrudeGeometry( shape, extrudeSettings );
+  return geo;
+}
+
+const snakeTexture = txtLoader.load('resources/lavatile.jpg');
+snakeTexture.wrapS = snakeTexture.wrapT = THREE.RepeatWrapping;
+
+const snakeMaterial = new THREE.MeshBasicMaterial( { map:snakeTexture } );
+// const mesh = new THREE.Mesh( snakeSegment(), material ) ;
+// mesh.position.z = 0.1;
+// scene.add( mesh );
+
+
+
 
 // Snake head
 const sneakHead = new THREE.Object3D; // invisible plane to center the cube
 const Z_OFFSET = 0.001
 const step = 1;
-sneakHead.position.copy(getRandomPosition()); 
+sneakHead.position.copy(getRandomPosition(false)); 
+sneakHead.position.z = 0.1;
 field.add( sneakHead );
 
-const sneakCubeLength = 0.95;
-const cubeGeometry = new THREE.BoxGeometry( sneakCubeLength, sneakCubeLength, sneakCubeLength ); 
 let cubeMaterial = new THREE.MeshStandardMaterial( { color: 0x59af3f,
                                                        metalness:0.5,
-                                                       roughness:0.1 } ); 
-const snakeHeadCube = new THREE.Mesh( cubeGeometry, cubeMaterial ); 
+                                                       roughness:0.1,
+                                                       map: snakeTexture } ); 
+// const snakeHeadCube = new THREE.Mesh( cubeGeometry, cubeMaterial ); 
+const snakeHeadCube = new THREE.Mesh( snakeSegment(), cubeMaterial ); 
 sneakHead.add( snakeHeadCube );
 
 // Snake body
@@ -87,8 +222,9 @@ field.add(snake)
 const bodySegment = new THREE.Object3D; // invisible plane to center the cube
 let bodyMaterial = new THREE.MeshStandardMaterial( { color: 'blue',
                                                        metalness:0.5,
-                                                       roughness:0.1 } ); 
-const snakeBodyCube = new THREE.Mesh( cubeGeometry, bodyMaterial ); 
+                                                       roughness:0.1,
+                                                       map: snakeTexture } ); 
+const snakeBodyCube = new THREE.Mesh( snakeSegment(), bodyMaterial ); 
 bodySegment.add( snakeBodyCube );
 
 
@@ -109,22 +245,27 @@ field.add( food );
 function getFoodPosition() {
   let foodPosition = new THREE.Vector3;
   do {
-    foodPosition = getRandomPosition();
+    foodPosition = getRandomPosition(true);
   } while ( collidesWithSnake(foodPosition) );
   return foodPosition;
 }
 
-function getRandomPosition() {
+function getRandomPosition(isFood) {
   const MAX = 4;
   const MIN = -6;
   const x = Math.ceil(Math.random() * ( MAX - MIN ) + MIN) + step / 2;
   const y = Math.ceil(Math.random() * ( MAX - MIN ) + MIN) + step / 2;
-  const z = step / 2 + Z_OFFSET;
+  let z = 0;
+  if (isFood == true){
+    z = step / 2 + Z_OFFSET;
+  } else {
+    z = 0.15;
+  }
   return new THREE.Vector3( x, y, z );
 }
 
 function collidesWithSnake(objectPosition) {
-  if (sneakHead.position.equals(objectPosition)){
+  if (sneakHead.position.x == objectPosition.x && sneakHead.position.y == objectPosition.y){
     return true;
   }
   return collidesWithSnakeBody(objectPosition);
@@ -132,7 +273,7 @@ function collidesWithSnake(objectPosition) {
 
 function collidesWithSnakeBody(objectPosition){
     for (const element of snakeBody.getValues()) {
-      if (element.position.equals(objectPosition)) {
+      if (element.position.x == objectPosition.x && element.position.y == objectPosition.y) {
         return true;
       }
   }
@@ -206,7 +347,7 @@ function moveSnake(event){
 }
 
 function snakeEatsFood() {
-  return sneakHead.position.equals(food.position);
+  return sneakHead.position.x == food.position.x && sneakHead.position.y == food.position.y;
 }
 
 function getSnakeLength() {
@@ -215,6 +356,8 @@ function getSnakeLength() {
 
 // * Render loop
 const controls = new TrackballControls(camera, renderer.domElement);
+controls.zoomSpeed = 5;
+controls.maxDistance = 35;
 function render() {
   requestAnimationFrame(render);
 
