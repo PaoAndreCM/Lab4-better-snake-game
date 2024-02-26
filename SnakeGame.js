@@ -2,6 +2,7 @@
 
 import * as THREE from "three";
 import { TrackballControls } from "three/addons/controls/TrackballControls.js";
+import {OBJLoader} from "three/addons/loaders/OBJLoader.js";
 
 // * Initialize webGL
 const canvas = document.getElementById("myCanvas");
@@ -208,11 +209,7 @@ sneakHead.position.copy(getRandomPosition(false));
 sneakHead.position.z = 0.1;
 field.add( sneakHead );
 
-let cubeMaterial = new THREE.MeshStandardMaterial( { color: 0x59af3f,
-                                                       metalness:0.5,
-                                                       roughness:0.1,
-                                                       map: snakeTexture } ); 
-// const snakeHeadCube = new THREE.Mesh( cubeGeometry, cubeMaterial ); 
+let cubeMaterial = new THREE.MeshStandardMaterial( { map: snakeTexture } ); 
 const snakeHeadCube = new THREE.Mesh( snakeSegment(), cubeMaterial ); 
 sneakHead.add( snakeHeadCube );
 
@@ -220,16 +217,46 @@ sneakHead.add( snakeHeadCube );
 const snake = new THREE.Object3D;
 field.add(snake)
 const bodySegment = new THREE.Object3D; // invisible plane to center the cube
-let bodyMaterial = new THREE.MeshStandardMaterial( { color: 'blue',
-                                                       metalness:0.5,
-                                                       roughness:0.1,
+let bodyMaterial = new THREE.MeshStandardMaterial( { color: 0xe8c68d,
                                                        map: snakeTexture } ); 
 const snakeBodyCube = new THREE.Mesh( snakeSegment(), bodyMaterial ); 
 bodySegment.add( snakeBodyCube );
 
-
 let snakeBody = new Deque();
-window.snakeBody = snakeBody;
+
+// Apple
+const objLoader = new OBJLoader();
+
+let food = null;
+
+objLoader.load(
+  'resources/Apple.obj',
+  function (object) {
+      const material = new THREE.MeshPhongMaterial({ color: 0xff0000 }); // Example material
+      object.traverse(function (child) {
+          if (child instanceof THREE.Mesh) {
+              child.material = material;
+          }
+      });
+      object.scale.set(0.01,0.01,0.01)
+      food = object;
+      food.position.copy(getFoodPosition())
+      food.rotation.x = Math.PI/2
+      scene.add(food);
+      render();
+
+  },
+  function (xhr) {
+      // On progress
+      console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+  },
+  function (error) {
+      // On error
+      console.error('An error happened', error);
+  }
+);
+
+// const appleGeometry = new THREE.Geometry().fromBufferGeometry(apple.children[0].geometry);
 
 
 // Food ball
@@ -238,9 +265,10 @@ const foodGeometry = new THREE.SphereGeometry( foodRadius );
 const foodMaterial = new THREE.MeshStandardMaterial( { color: 0xbf2237,
                                                     metalness:0.5,
                                                     roughness:0.1 } ); 
-const food = new THREE.Mesh( foodGeometry, foodMaterial ); 
-food.position.copy(getFoodPosition())
-field.add( food );
+// const food = new THREE.Mesh( foodGeometry, foodMaterial ); 
+// const food = apple; 
+// food.position.copy(getFoodPosition())
+// field.add( food );
 
 function getFoodPosition() {
   let foodPosition = new THREE.Vector3;
@@ -257,7 +285,7 @@ function getRandomPosition(isFood) {
   const y = Math.ceil(Math.random() * ( MAX - MIN ) + MIN) + step / 2;
   let z = 0;
   if (isFood == true){
-    z = step / 2 + Z_OFFSET;
+    z = step / 3 + Z_OFFSET;
   } else {
     z = 0.15;
   }
@@ -374,7 +402,7 @@ function render() {
   renderer.render(scene, camera);
   controls.update();
 }
-render();
+// render();
 
 
 
