@@ -9,30 +9,25 @@ const canvas = document.getElementById("myCanvas");
 const renderer = new THREE.WebGLRenderer({canvas,
                                           antialias: true});
 renderer.setClearColor('rgb(255,255,255)');    // set background color
-// renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(30, canvas.width / canvas.height, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(45, canvas.width / canvas.height, 0.1, 1000);
 
-// window.addEventListener("resize", function () {
-//   renderer.setSize(window.innerWidth, window.innerHeight);
-//   camera.aspect = window.innerWidth / window.innerHeight;
-//   camera.updateProjectionMatrix();
-// });
+window.addEventListener("resize", function () {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+});
 
-camera.position.set( 0.13921937852101335, -33.60575621603862, 9.779251868769181);
+camera.position.set( 0, -19.48, 6.82);
 camera.lookAt(scene.position);
 scene.add(camera);
-window.camera = camera; // TODO DELETE THIS
-scene.add(new THREE.AxesHelper(1.5));
 
 // Add light sources
 scene.add(new THREE.AmbientLight('#ffffff'));
-// const light = new THREE.DirectionalLight();
-// light.position.set(0,0,1);
-// scene.add(light);
 
 const spotlight = new THREE.SpotLight(0xffffff);
 spotlight.castShadow = true; // default false
@@ -45,12 +40,6 @@ spotlight.shadow.camera.near = 6;
 spotlight.shadow.camera.far = 100;
 spotlight.intensity = 1000;
 scene.add(spotlight);
-const spotLightHelper = new THREE.SpotLightHelper( spotlight );
-scene.add( spotLightHelper );
-
-const spotlightBulb = new THREE.Mesh(new THREE.SphereGeometry(0.5), new THREE.MeshBasicMaterial({color:'yellow'}))
-spotlightBulb.position.copy(spotlight.position)
-scene.add(spotlightBulb);
 
 // create an AudioListener and add it to the camera
 const listener = new THREE.AudioListener();
@@ -96,7 +85,7 @@ skyBox.rotation.x = Math.PI / 2;
 scene.add(skyBox);
 
 // Gray ground
-const groundGeo = new THREE.CircleGeometry(skyCubeSize/2, 32);
+const groundGeo = new THREE.CircleGeometry(skyCubeSize/8, 32);
 const groundMat = new THREE.MeshPhongMaterial({color:'gray'});
 const ground = new THREE.Mesh(groundGeo, groundMat);
 ground.position.z = -0.002;
@@ -111,13 +100,6 @@ const fieldSize = 12;
 const widthSegments = 12;
 const heightSegments = 12;
 const fieldGeometry = new THREE.PlaneGeometry( fieldSize, fieldSize, widthSegments, heightSegments );
-// const fieldMaterial = new THREE.MeshBasicMaterial({ color: 0xc6bac2, 
-//                                                     side: THREE.DoubleSide, 
-//                                                     wireframe:false,
-//                                                     wireframeLinewidth:2.0 }); 
-// fieldMaterial.transparent = true;
-// fieldMaterial.opacity = 0.7;
-
 const playingFieldTexture = txtLoader.load('resources/FloorsCheckerboard_S_Diffuse.jpg');
 playingFieldTexture.wrapS = THREE.RepeatWrapping;
 playingFieldTexture.wrapT = THREE.RepeatWrapping;
@@ -126,9 +108,7 @@ const playingFieldNormalMap = txtLoader.load('resources/FloorsCheckerboard_S_Nor
 const playingFieldMaterial = new THREE.MeshStandardMaterial({
   map: playingFieldTexture,
   normalMap: playingFieldNormalMap,
-  // side: THREE.DoubleSide,
-  roughness: 0.8,
-  metalness: 0.2
+  roughness: 0.45,
 });
 
 const playingField = new THREE.Mesh(fieldGeometry, playingFieldMaterial);
@@ -165,24 +145,17 @@ wallTexture.wrapT = THREE.RepeatWrapping;
 wallTexture.repeat.set(0,3);
 const wallBumpMap = txtLoader.load('resources/hardwood2_bump.jpg')
 
-const frameGeometry = new THREE.ExtrudeGeometry(outerFrame, frameExtrudeSettings);
-const frameMaterial = new THREE.MeshPhongMaterial({
+const wallsGeometry = new THREE.ExtrudeGeometry(outerFrame, frameExtrudeSettings);
+const wallsMaterial = new THREE.MeshPhongMaterial({
   color: 0x9b8369,
   side: THREE.DoubleSide,
   map: wallTexture,
   bumpMap: wallBumpMap,
   bumpScale: 0.1
 });
-const frameMesh = new THREE.Mesh(frameGeometry, frameMaterial);
-frameMesh.castShadow = true;
-scene.add(frameMesh);
-
-// Grid
-// const size = 12;
-// const divisions = 12;
-// const gridHelper = new THREE.GridHelper( fieldSize, fieldSize );
-// gridHelper.rotation.x = - Math.PI / 2;
-// field.add( gridHelper );
+const wallsMesh = new THREE.Mesh(wallsGeometry, wallsMaterial);
+wallsMesh.castShadow = true;
+scene.add(wallsMesh);
 
 // rounded cube
 
@@ -237,9 +210,8 @@ bodySegment.add( snakeBodyCube );
 
 let snakeBody = new Deque();
 
-// Apple
+// Apple = food
 const objLoader = new OBJLoader();
-
 let food = null;
 
 objLoader.load(
@@ -263,34 +235,34 @@ objLoader.load(
       food = object;
       food.position.copy(getFoodPosition())
       food.rotation.x = Math.PI/2
-      // food.castShadow = true;
       scene.add(food);
       render();
 
   },
   function (xhr) {
-      // On progress
       console.log((xhr.loaded / xhr.total * 100) + '% loaded');
   },
   function (error) {
-      // On error
       console.error('An error happened', error);
   }
 );
 
-// const appleGeometry = new THREE.Geometry().fromBufferGeometry(apple.children[0].geometry);
+// Display Board
+const width = 640;
+const height = 480;
+const rt = new THREE.WebGLRenderTarget(width,height);
+const mat = new THREE.MeshPhongMaterial({map: rt.texture});
 
+const rtCamera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+rtCamera.aspect = width/height;
 
-// Food ball
-const foodRadius = 0.5;
-const foodGeometry = new THREE.SphereGeometry( foodRadius ); 
-const foodMaterial = new THREE.MeshStandardMaterial( { color: 0xbf2237,
-                                                    metalness:0.5,
-                                                    roughness:0.1 } ); 
-// const food = new THREE.Mesh( foodGeometry, foodMaterial ); 
-// const food = apple; 
-// food.position.copy(getFoodPosition())
-// field.add( food );
+const screenPlane = new THREE.Mesh(new THREE.PlaneGeometry(8,6), mat);
+screenPlane.rotation.x = Math.PI/2;
+screenPlane.position.set(0, 6.5, 2);
+screenPlane.castShadow = true;
+scene.add(screenPlane);
+
+// Rest of Game logic
 
 function getFoodPosition() {
   let foodPosition = new THREE.Vector3;
@@ -381,6 +353,8 @@ function moveSnake(event){
   if ( event.key == "ArrowLeft" && direction.x != 1 ){
       direction.y=0;
       direction.x=-1;
+      rtCamera.rotation.z = -Math.PI/2;
+      rtCamera.updateProjectionMatrix();
   }
   if ( event.key == "ArrowRight" && direction.x != -1 ){
       direction.y=0;
@@ -394,6 +368,7 @@ function moveSnake(event){
       direction.y=-1;
       direction.x=0;
   }
+  console.log('Direction:', direction);
 }
 
 function snakeEatsFood() {
@@ -420,8 +395,26 @@ function render() {
     snakeBody.insertBack(cube2); // adds new cube to the snake body
     food.position.copy(getFoodPosition()); // gives the food a new position
   }
+  
+  // Update rtCamera's position and lookAt
+  rtCamera.position.copy(sneakHead.position.clone().add(new THREE.Vector3(0,0,0.5)));
+  const targetPosition = sneakHead.position.clone().add(direction).add(new THREE.Vector3(0,0,0.5));
+  rtCamera.lookAt(targetPosition); 
 
+  if (direction.equals(new THREE.Vector3(1,0,0))){ // snake looking to the right
+    rtCamera.rotation.z = -Math.PI/2;
+  } else if (direction.equals(new THREE.Vector3(-1,0,0))){
+    rtCamera.rotation.z = Math.PI/2;
+  } else if (direction.equals(new THREE.Vector3(0,-1,0))){
+    rtCamera.rotation.z = Math.PI;
+  }
+
+  renderer.setRenderTarget(null);
   renderer.render(scene, camera);
+
+  renderer.setRenderTarget(rt);
+  renderer.render(scene, rtCamera);
+
   controls.update();
 }
 
